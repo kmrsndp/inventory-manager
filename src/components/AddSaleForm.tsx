@@ -18,6 +18,7 @@ interface ProductData {
 interface SaleData {
   id: string;
   'total price': number;
+  userId: string;
   // Other fields can be added if needed
 }
 
@@ -43,8 +44,8 @@ export default function AddSaleForm() {
       try {
         // Fetch products and monthly sales in parallel
         const [fetchedProducts, monthlySales] = await Promise.all([
-          getProducts() as Promise<ProductData[]>,
-          getMonthlySales() as Promise<SaleData[]>
+          getProducts(user.uid) as Promise<ProductData[]>,
+          getMonthlySales(user.uid) as Promise<SaleData[]>
         ]);
 
         setProducts(fetchedProducts);
@@ -117,10 +118,11 @@ export default function AddSaleForm() {
       qty: quantity,
       'sold to': customerName || 'N/A',
       'total price': totalPrice,
+      userId: user.uid, // Add userId here
     };
 
     try {
-      await addSale(saleData);
+      await addSale(saleData, user.uid);
 
       // Update product stock
       const updatedStock = selectedProduct.Quantity - Number(quantity);
@@ -132,12 +134,12 @@ export default function AddSaleForm() {
       setCustomerName('');
       setSaleDate(new Date());
       // Refetch products to update stock in dropdown
-      const updatedProducts = await getProducts() as ProductData[];
+      const updatedProducts = await getProducts(user.uid) as ProductData[];
       setProducts(updatedProducts);
       setSelectedProduct(updatedProducts.find(p => p.id === selectedProduct.id) || null);
       
       // Refetch monthly sales to update summary
-      const monthlySales = await getMonthlySales() as SaleData[];
+      const monthlySales = await getMonthlySales(user.uid) as SaleData[];
       const total = monthlySales.reduce((acc, sale) => acc + (sale['total price'] || 0), 0);
       setMonthlySalesTotal(total);
 
