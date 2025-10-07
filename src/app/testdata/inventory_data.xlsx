@@ -1,0 +1,21 @@
+Item Name,Category,Price,Quantity,Supplier,Last Updated
+Laptop,Electronics,1200,10,Dell,2024-10-01
+Mouse,Electronics,25,50,Logitech,2024-09-28
+Keyboard,Electronics,75,30,Razer,2024-09-25
+Monitor,Electronics,300,15,Samsung,2024-10-02
+Webcam,Electronics,50,20,Logitech,2024-09-30
+Desk Chair,Furniture,150,5,Herman Miller,2024-09-15
+Standing Desk,Furniture,400,3,FlexiSpot,2024-09-20
+Headphones,Audio,100,25,Sony,2024-10-05
+Microphone,Audio,80,12,Blue Yeti,2024-10-03
+External SSD,Storage,90,18,Samsung,2024-09-29
+Printer,Office Supplies,200,7,HP,2024-09-22
+Router,Networking,60,10,TP-Link,2024-09-18
+Webcam Cover,Accessories,5,100,PrivacyCo,2024-10-04
+USB Hub,Accessories,15,40,Anker,2024-09-27
+Graphics Card,PC Components,500,8,NVIDIA,2024-09-10
+CPU,PC Components,300,10,Intel,2024-09-12
+RAM,PC Components,70,20,Corsair,2024-09-14
+Webcam Tripod,Accessories,20,15,Joby,2024-10-01
+Gaming Mousepad,Gaming,20,30,SteelSeries,2024-09-26
+Smartwatch,Wearables,250,5,Apple,2024-10-06

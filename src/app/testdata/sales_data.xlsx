@@ -1,0 +1,21 @@
+Date,item,price,qty,sold to,total price
+2024-01-15,Laptop,1200,1,John Doe,1200
+2024-01-20,Mouse,25,2,Jane Smith,50
+2024-02-01,Keyboard,75,1,Alice Brown,75
+2024-02-10,Monitor,300,1,Bob White,300
+2024-03-05,Webcam,50,3,Charlie Green,150
+2024-03-12,Laptop,1200,1,David Black,1200
+2024-04-01,Mouse,25,5,Eve Blue,125
+2024-04-22,Keyboard,75,2,Frank Red,150
+2024-05-03,Monitor,300,1,Grace Yellow,300
+2024-05-18,Webcam,50,2,Harry Orange,100
+2024-06-07,Laptop,1200,1,Ivy Purple,1200
+2024-06-25,Mouse,25,4,Jack Pink,100
+2024-07-01,Keyboard,75,1,Karen Grey,75
+2024-07-19,Monitor,300,1,Liam Cyan,300
+2024-08-08,Webcam,50,3,Mia Magenta,150
+2024-08-14,Laptop,1200,1,Noah Gold,1200
+2024-09-02,Mouse,25,2,Olivia Silver,50
+2024-09-11,Keyboard,75,1,Peter Bronze,75
+2024-10-01,Monitor,300,1,Quinn Platinum,300
+2024-10-20,Webcam,50,2,Rachel Copper,100
