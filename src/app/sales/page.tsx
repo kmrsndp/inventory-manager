@@ -36,6 +36,7 @@ interface SaleData {
   qty: number;
   'sold to'?: string;
   'total price': number;
+  userId: string;
 }
 
 interface ProductData {
@@ -62,8 +63,8 @@ export default function SalesPage() {
     setError(null);
     try {
       const [fetchedSales, fetchedProducts] = await Promise.all([
-        getSales() as Promise<SaleData[]>,
-        getProducts() as Promise<ProductData[]>
+        getSales(user.uid) as Promise<SaleData[]>,
+        getProducts(user.uid) as Promise<ProductData[]>
       ]);
       setSalesData(fetchedSales);
       setProducts(fetchedProducts);
@@ -103,7 +104,7 @@ export default function SalesPage() {
             if (sale.price && sale.qty && !sale['total price']) {
               sale['total price'] = sale.price * sale.qty;
             }
-            await addSale(sale);
+            await addSale(sale, user.uid);
           }
           await fetchSalesAndProducts();
         } catch (err) {
