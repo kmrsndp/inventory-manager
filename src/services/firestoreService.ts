@@ -10,8 +10,6 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { useAuth } from '@/context/AuthContext';
-
 // Collection references
 const productsCollection = collection(db, 'products');
 const salesCollection = collection(db, 'sales');

@@ -43,8 +43,8 @@ export default function DashboardPage() {
       setLoadingData(true);
       setError(null);
       try {
-        const fetchedSales = await getSales() as SaleData[];
-        const fetchedProducts = await getProducts() as ProductData[];
+        const fetchedSales = await getSales(user.uid) as SaleData[];
+        const fetchedProducts = await getProducts(user.uid) as ProductData[];
         setSales(fetchedSales);
         setProducts(fetchedProducts);
       } catch (err) {
