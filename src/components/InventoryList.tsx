@@ -14,6 +14,7 @@ interface InventoryItem {
   'Quantity': number;
   'Supplier': string;
   'Last Updated': string;
+  userId: string;
 }
 
 export default function InventoryList() {
@@ -30,7 +31,7 @@ export default function InventoryList() {
     setLoading(true);
     setError(null);
     try {
-      const items = await getProducts();
+      const items = await getProducts(user.uid);
       setInventoryItems(items as InventoryItem[]);
     } catch (err) {
       console.error("Failed to fetch inventory:", err);
@@ -64,7 +65,7 @@ export default function InventoryList() {
         try {
           // Add each item to Firestore
           for (const item of json) {
-            await addProduct(item);
+            await addProduct(item, user.uid);
           }
           // After successful upload, refetch inventory to update UI
           await fetchInventory();
