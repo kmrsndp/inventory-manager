@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function useAuthGuard() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 }
