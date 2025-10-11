@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { addProduct, getProducts } from '@/services/firestoreService';
+import { addProduct, getProducts, updateProduct, deleteProduct, onInventoryChange } from '@/services/firestoreService';
 import { useAuth } from '@/context/AuthContext';
-import { UploadCloud } from 'lucide-react'; // Moved to top-level
+import { UploadCloud, Pencil, Trash2 } from 'lucide-react';
+import EditRow from './EditRow';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface InventoryItem {
   id?: string; // Optional for new items, required for existing
@@ -22,28 +25,23 @@ export default function InventoryList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-
-  const fetchInventory = React.useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const items = await getProducts(user.uid);
-      setInventoryItems(items as InventoryItem[]);
-    } catch (err) {
-      console.error("Failed to fetch inventory:", err);
-      setError("Failed to load inventory items.");
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
-    fetchInventory();
-  }, [user, fetchInventory]); // Refetch when user changes
+    if (user) {
+      setLoading(true);
+      const unsubscribe = onInventoryChange(user.uid, (items: InventoryItem[]) => {
+        setInventoryItems(items);
+        setLoading(false);
+      }, (err: Error) => {
+        console.error("Failed to fetch inventory:", err);
+        setError("Failed to load inventory items.");
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -67,8 +65,6 @@ export default function InventoryList() {
           for (const item of json) {
             await addProduct(item, user.uid);
           }
-          // After successful upload, refetch inventory to update UI
-          await fetchInventory();
         } catch (err) {
           console.error("Error uploading inventory data:", err);
           setError("Failed to upload inventory data to Firestore.");
@@ -121,25 +117,71 @@ export default function InventoryList() {
                 <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Quantity</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Supplier</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Last Updated</th>
+                <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems.map((item, index) => (
-                <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="py-3 px-4 text-left text-gray-700">{item['Item Name']}</td>
-                  <td className="py-3 px-4 text-left text-gray-700">{item.Category}</td>
-                  <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.Price)}</td>
-                  <td className="py-3 px-4 text-right text-gray-700">{item.Quantity}</td>
-                  <td className="py-3 px-4 text-left text-gray-700">{item.Supplier}</td>
-                  <td className="py-3 px-4 text-left text-gray-700">{new Date(item['Last Updated']).toLocaleDateString()}</td>
-                </tr>
-            ))}
-          </tbody>
-        </table>
+                editingItem?.id === item.id ? (
+                  <EditRow
+                    key={item.id}
+                    item={editingItem}
+                    onSave={async (updatedItem: InventoryItem) => {
+                      if (!user || !updatedItem.id) return;
+                      try {
+                        await updateProduct(updatedItem.id, updatedItem);
+                        toast.success('Item updated successfully!');
+                      } catch (error) {
+                        toast.error('Failed to update item.');
+                      } finally {
+                        setEditingItem(null);
+                      }
+                    }}
+                    onCancel={() => setEditingItem(null)}
+                  />
+                ) : (
+                  <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="py-3 px-4 text-left text-gray-700">{item['Item Name']}</td>
+                    <td className="py-3 px-4 text-left text-gray-700">{item.Category}</td>
+                    <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.Price)}</td>
+                    <td className="py-3 px-4 text-right text-gray-700">{item.Quantity}</td>
+                    <td className="py-3 px-4 text-left text-gray-700">{item.Supplier}</td>
+                    <td className="py-3 px-4 text-left text-gray-700">{new Date(item['Last Updated']).toLocaleDateString()}</td>
+                    <td className="py-3 px-4 text-right space-x-2">
+                      <button onClick={() => setEditingItem(item)} className="p-1 rounded-full hover:bg-gray-100">
+                        <Pencil size={16} className="text-gray-600" />
+                      </button>
+                      <button onClick={() => setDeletingItem(item)} className="p-1 rounded-full hover:bg-red-100">
+                        <Trash2 size={16} className="text-red-600" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <p className="text-center text-gray-600 mt-4">No inventory items found. Please upload an Excel file.</p>
       )}
+      {deletingItem && (
+        <ConfirmDeleteDialog
+          item={deletingItem}
+          onConfirm={async () => {
+            if (!user || !deletingItem.id) return;
+            try {
+              await deleteProduct(deletingItem.id);
+              toast.success('Item deleted successfully!');
+            } catch (error) {
+              toast.error('Failed to delete item.');
+            } finally {
+              setDeletingItem(null);
+            }
+          }}
+          onCancel={() => setDeletingItem(null)}
+        />
+      )}
+      <Toaster />
     </section>
   );
 }

@@ -9,6 +9,7 @@ import {
   doc,
   query,
   where,
+  onSnapshot,
 } from 'firebase/firestore';
 // Collection references
 const productsCollection = collection(db, 'products');
@@ -87,6 +88,17 @@ export const deleteProduct = async (id: string) => {
     console.error('Error deleting product: ', error);
     throw error;
   }
+};
+
+export const onInventoryChange = (userId: string, callback: (products: ProductData[]) => void, onError: (error: Error) => void) => {
+  const q = query(productsCollection, where('userId', '==', userId));
+  return onSnapshot(q, (querySnapshot) => {
+    const products = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as ProductData));
+    callback(products);
+  }, (error) => {
+    console.error('Error getting real-time products: ', error);
+    onError(error);
+  });
 };
 
 // --- Sales CRUD ---
