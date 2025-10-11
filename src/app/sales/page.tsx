@@ -155,7 +155,10 @@ export default function SalesPage() {
   });
 
   products.forEach(product => {
-    totalRemainingStock += product.Quantity;
+    const quantity = Number(product.Quantity);
+    if (!isNaN(quantity)) {
+      totalRemainingStock += quantity;
+    }
   });
 
 
