@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { LogOut, User, Settings, Upload, ChevronDown } from 'lucide-react';
+import Image from 'next/image';
 import { useState } from 'react';
 
 export default function ProfileAvatar() {
@@ -29,10 +30,16 @@ export default function ProfileAvatar() {
           >
             <div className="flex items-center justify-center w-10 h-10 bg-gray-200 rounded-full text-gray-600 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
               {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-10 h-10 rounded-full" />
+                <Image
+                  src={`${user.photoURL}?sz=200`} // Google profile fix
+                  alt="Profile"
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
               ) : (
-                <span className="text-lg font-semibold">{getInitials(user.email)}</span>
-              )}
+              <span className="text-lg font-semibold">{getInitials(user.email)}</span>
+            )}
             </div>
             <ChevronDown size={16} className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
           </button>

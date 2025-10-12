@@ -13,10 +13,13 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { addSale, getSales, getProducts } from '@/services/firestoreService';
+import { addSale, onSalesChange, updateSale, deleteSale, onInventoryChange } from '@/services/firestoreService';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuardWrapper from '@/components/Auth/AuthGuardWrapper';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Pencil, Trash2 } from 'lucide-react';
+import EditSaleRow from '@/components/EditSaleRow';
+import ConfirmDeleteSaleDialog from '@/components/ConfirmDeleteSaleDialog';
+import toast, { Toaster } from 'react-hot-toast';
 
 ChartJS.register(
   CategoryScale,
@@ -40,10 +43,14 @@ interface SaleData {
 }
 
 interface ProductData {
-  id: string;
+  id?: string;
   'Item Name': string;
+  'Category': string;
   'Price': number;
   'Quantity': number;
+  'Supplier': string;
+  'Last Updated': string;
+  userId: string;
 }
 
 export default function SalesPage() {
@@ -53,33 +60,35 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-
-  const fetchSalesAndProducts = React.useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const [fetchedSales, fetchedProducts] = await Promise.all([
-        getSales(user.uid) as Promise<SaleData[]>,
-        getProducts(user.uid) as Promise<ProductData[]>
-      ]);
-      setSalesData(fetchedSales);
-      setProducts(fetchedProducts);
-      processSalesDataForChart(fetchedSales);
-    } catch (err) {
-      console.error("Failed to fetch sales or products:", err);
-      setError("Failed to load sales data or products.");
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  const [editingSale, setEditingSale] = useState<SaleData | null>(null);
+  const [deletingSale, setDeletingSale] = useState<SaleData | null>(null);
 
   useEffect(() => {
-    fetchSalesAndProducts();
-  }, [user, fetchSalesAndProducts]);
+    if (user) {
+      setLoading(true);
+      const unsubscribeSales = onSalesChange(user.uid, (sales: SaleData[]) => {
+        setSalesData(sales);
+        processSalesDataForChart(sales);
+        setLoading(false);
+      }, (err: Error) => {
+        console.error("Failed to fetch sales:", err);
+        setError("Failed to load sales data.");
+        setLoading(false);
+      });
+
+      const unsubscribeProducts = onInventoryChange(user.uid, (products: ProductData[]) => {
+        setProducts(products);
+      }, (err: Error) => {
+        console.error("Failed to fetch products:", err);
+        setError("Failed to load products.");
+      });
+
+      return () => {
+        unsubscribeSales();
+        unsubscribeProducts();
+      };
+    }
+  }, [user]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -106,7 +115,6 @@ export default function SalesPage() {
             }
             await addSale(sale, user.uid);
           }
-          await fetchSalesAndProducts();
         } catch (err) {
           console.error("Error uploading sales data:", err);
           setError("Failed to upload sales data to Firestore.");
@@ -222,18 +230,47 @@ export default function SalesPage() {
                   <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Quantity</th>
                   <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Sold To</th>
                   <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Total Price</th>
+                  <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {salesData.map((sale, index) => (
-                  <tr key={sale.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="py-3 px-4 text-left text-gray-700">{new Date(sale.Date).toLocaleDateString()}</td>
-                    <td className="py-3 px-4 text-left text-gray-700">{sale.item}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(sale.price)}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">{sale.qty}</td>
-                    <td className="py-3 px-4 text-left text-gray-700">{sale['sold to'] || 'N/A'}</td>
-                    <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(sale['total price'])}</td>
-                  </tr>
+                  editingSale?.id === sale.id && editingSale ? (
+                    <EditSaleRow
+                      key={sale.id}
+                      sale={editingSale}
+                      onSave={async (updatedSale: SaleData) => {
+                        if (!user || !updatedSale.id) return;
+                        try {
+                          await updateSale(updatedSale.id, updatedSale);
+                          toast.success('Sale updated successfully!');
+                        } catch (error) {
+                          toast.error('Failed to update sale.');
+                          console.log("error thrown is", error);
+                        } finally {
+                          setEditingSale(null);
+                        }
+                      }}
+                      onCancel={() => setEditingSale(null)}
+                    />
+                  ) : (
+                    <tr key={sale.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="py-3 px-4 text-left text-gray-700">{new Date(sale.Date).toLocaleDateString()}</td>
+                      <td className="py-3 px-4 text-left text-gray-700">{sale.item}</td>
+                      <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(sale.price)}</td>
+                      <td className="py-3 px-4 text-right text-gray-700">{sale.qty}</td>
+                      <td className="py-3 px-4 text-left text-gray-700">{sale['sold to'] || 'N/A'}</td>
+                      <td className="py-3 px-4 text-right text-gray-700">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(sale['total price'])}</td>
+                      <td className="py-3 px-4 text-right space-x-2">
+                        <button onClick={() => setEditingSale(sale)} className="p-1 rounded-full hover:bg-gray-100">
+                          <Pencil size={16} className="text-gray-600" />
+                        </button>
+                        <button onClick={() => setDeletingSale(sale)} className="p-1 rounded-full hover:bg-red-100">
+                          <Trash2 size={16} className="text-red-600" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
                 ))}
               </tbody>
             </table>
@@ -251,6 +288,26 @@ export default function SalesPage() {
           </div>
         </section>
       )}
+      {deletingSale && (
+        <ConfirmDeleteSaleDialog
+          sale={deletingSale}
+          onConfirm={async () => {
+            if (!user || !deletingSale.id) return;
+            try {
+              await deleteSale(deletingSale.id);
+              toast.success('Sale deleted successfully!');
+            } catch (error) {
+              toast.error('Failed to delete sale.');
+              console.log("error thrown is", error);
+              
+            } finally {
+              setDeletingSale(null);
+            }
+          }}
+          onCancel={() => setDeletingSale(null)}
+        />
+      )}
+      <Toaster />
     </div>
   );
 }

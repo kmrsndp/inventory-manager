@@ -101,6 +101,17 @@ export const onInventoryChange = (userId: string, callback: (products: ProductDa
   });
 };
 
+export const onSalesChange = (userId: string, callback: (sales: SaleData[]) => void, onError: (error: Error) => void) => {
+  const q = query(salesCollection, where('userId', '==', userId));
+  return onSnapshot(q, (querySnapshot) => {
+    const sales = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as SaleData));
+    callback(sales);
+  }, (error) => {
+    console.error('Error getting real-time sales: ', error);
+    onError(error);
+  });
+};
+
 // --- Sales CRUD ---
 export const addSale = async (saleData: Omit<SaleData, 'id'>, userId: string) => {
   try {

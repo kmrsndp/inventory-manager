@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { addProduct, getProducts, updateProduct, deleteProduct, onInventoryChange } from '@/services/firestoreService';
+import { addProduct, updateProduct, deleteProduct, onInventoryChange } from '@/services/firestoreService';
 import { useAuth } from '@/context/AuthContext';
 import { UploadCloud, Pencil, Trash2 } from 'lucide-react';
 import EditRow from './EditRow';
@@ -122,7 +122,7 @@ export default function InventoryList() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems.map((item, index) => (
-                editingItem?.id === item.id ? (
+                editingItem?.id === item.id && editingItem ? (
                   <EditRow
                     key={item.id}
                     item={editingItem}
@@ -133,6 +133,7 @@ export default function InventoryList() {
                         toast.success('Item updated successfully!');
                       } catch (error) {
                         toast.error('Failed to update item.');
+                        console.log("error thrown is", error);
                       } finally {
                         setEditingItem(null);
                       }
@@ -174,6 +175,7 @@ export default function InventoryList() {
               toast.success('Item deleted successfully!');
             } catch (error) {
               toast.error('Failed to delete item.');
+              console.log("error thrown is", error);
             } finally {
               setDeletingItem(null);
             }
