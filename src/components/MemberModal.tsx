@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Member, Payment } from '@/types/member';
-import { X, Plus, Edit, Trash2, Calendar, Clock, DollarSign, List, User } from 'lucide-react';
+import { X, Plus, Edit, Trash2, Clock, List, User } from 'lucide-react';
 import { format, parseISO, isBefore, addDays } from 'date-fns';
 import { updateMember, deleteMember } from '@/services/memberService'; // Assuming these exist or will be created
 import toast from 'react-hot-toast';

@@ -62,14 +62,6 @@ export default function BurnBlastPage() {
     setSelectedMember(null);
   };
 
-  const handleSaveMember = async (updatedMember: Member) => {
-    // In a real app, you would have a service function to update the member.
-    console.log('Saving member:', updatedMember);
-    // For now, just update the local state
-    setMembers(members.map((m: Member) => m.id === updatedMember.id ? updatedMember : m));
-    toast.success('Member updated successfully!');
-    handleCloseModal();
-  };
 
   return (
     <div className="p-8">

@@ -113,7 +113,7 @@ export default function InventoryList() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems.map((item, index) => (
-                editingItem?.id === item.id ? (
+                editingItem?.id === item.id && editingItem ? (
                   <EditRow
                     key={item.id}
                     item={editingItem}
