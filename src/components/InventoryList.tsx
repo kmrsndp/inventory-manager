@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { addProduct, getProducts, updateProduct, deleteProduct, onInventoryChange } from '@/services/firestoreService';
+import { addProduct, updateProduct, deleteProduct, onInventoryChange } from '@/services/firestoreService';
 import { useAuth } from '@/context/AuthContext';
 import { UploadCloud, Pencil, Trash2 } from 'lucide-react';
 import EditRow from './EditRow';
@@ -23,7 +23,6 @@ interface InventoryItem {
 export default function InventoryList() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
@@ -36,7 +35,6 @@ export default function InventoryList() {
         setLoading(false);
       }, (err: Error) => {
         console.error("Failed to fetch inventory:", err);
-        setError("Failed to load inventory items.");
         setLoading(false);
       });
       return () => unsubscribe();
@@ -47,7 +45,6 @@ export default function InventoryList() {
     const file = event.target.files?.[0];
     if (file) {
       if (!user) {
-        setError("You must be logged in to upload inventory data.");
         return;
       }
 
@@ -59,7 +56,6 @@ export default function InventoryList() {
         const worksheet = workbook.Sheets[sheetName];
         const json: InventoryItem[] = XLSX.utils.sheet_to_json(worksheet);
 
-        setError(null);
         try {
           // Add each item to Firestore
           for (const item of json) {
@@ -67,7 +63,6 @@ export default function InventoryList() {
           }
         } catch (err) {
           console.error("Error uploading inventory data:", err);
-          setError("Failed to upload inventory data to Firestore.");
         }
       };
       reader.readAsArrayBuffer(file);
@@ -76,10 +71,6 @@ export default function InventoryList() {
 
   if (loading) {
     return <div className="text-center mt-8">Loading inventory...</div>;
-  }
-
-  if (error) {
-    return <div className="text-center mt-8 text-red-500">{error}</div>;
   }
 
   if (!user) {
@@ -122,7 +113,7 @@ export default function InventoryList() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {inventoryItems.map((item, index) => (
-                editingItem?.id === item.id ? (
+                editingItem?.id === item.id && editingItem ? (
                   <EditRow
                     key={item.id}
                     item={editingItem}
@@ -133,6 +124,8 @@ export default function InventoryList() {
                         toast.success('Item updated successfully!');
                       } catch (error) {
                         toast.error('Failed to update item.');
+                        console.log("error " + error);
+                        
                       } finally {
                         setEditingItem(null);
                       }
@@ -166,13 +159,13 @@ export default function InventoryList() {
       )}
       {deletingItem && (
         <ConfirmDeleteDialog
-          item={deletingItem}
+          item={deletingItem as InventoryItem} // Cast to InventoryItem as it's guaranteed not null here
           onConfirm={async () => {
             if (!user || !deletingItem.id) return;
             try {
               await deleteProduct(deletingItem.id);
               toast.success('Item deleted successfully!');
-            } catch (error) {
+            } catch {
               toast.error('Failed to delete item.');
             } finally {
               setDeletingItem(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Package, LineChart, LayoutDashboard, PlusSquare } from 'lucide-react';
+import { Package, LineChart, LayoutDashboard, PlusSquare, Zap } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 export default function Sidebar() {
@@ -12,6 +12,7 @@ export default function Sidebar() {
     { name: 'Inventory', href: '/inventory', icon: Package },
     { name: 'Sales', href: '/sales', icon: LineChart },
     { name: 'Add Sale', href: '/add-sale', icon: PlusSquare },
+    { name: 'Burn & Blast', href: '/burn-blast', icon: Zap },
   ];
 
   return (

@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuardWrapper from '@/components/Auth/AuthGuardWrapper';
 import { getSales, getProducts } from '@/services/firestoreService';
+import { updateMemberStatus } from '@/services/memberService'; // Import updateMemberStatus
 import { LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import KPICard from '@/components/KPICard';
-import { TrendingUp, Package, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Package, AlertTriangle, Users, UserCheck, UserX, UserMinus } from 'lucide-react'; // Add new icons
 
 interface SaleData {
   id?: string;
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [sales, setSales] = useState<SaleData[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
+  const [memberStats, setMemberStats] = useState({ totalMembers: 0, activeCount: 0, dueSoonCount: 0, overdueCount: 0 });
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,10 +45,14 @@ export default function DashboardPage() {
       setLoadingData(true);
       setError(null);
       try {
-        const fetchedSales = await getSales(user.uid) as SaleData[];
-        const fetchedProducts = await getProducts(user.uid) as ProductData[];
+        const [fetchedSales, fetchedProducts, fetchedMemberStats] = await Promise.all([
+          getSales(user.uid) as Promise<SaleData[]>,
+          getProducts(user.uid) as Promise<ProductData[]>,
+          updateMemberStatus(), // Fetch member stats
+        ]);
         setSales(fetchedSales);
         setProducts(fetchedProducts);
+        setMemberStats(fetchedMemberStats);
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
         setError("Failed to load dashboard data.");
@@ -166,6 +172,34 @@ export default function DashboardPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard
+          title="Total Members"
+          value={memberStats.totalMembers.toString()}
+          icon={Users}
+          color="blue"
+        />
+        <KPICard
+          title="Active Members"
+          value={memberStats.activeCount.toString()}
+          icon={UserCheck}
+          color="green"
+        />
+        <KPICard
+          title="Due Soon"
+          value={memberStats.dueSoonCount.toString()}
+          icon={UserMinus}
+          color="amber"
+        />
+        <KPICard
+          title="Overdue"
+          value={memberStats.overdueCount.toString()}
+          icon={UserX}
+          color="red"
+        />
+      </div>
+
+      {/* Original KPI Cards (optional, can be kept or removed based on design) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
           title="Current Month Sales"
           value={new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(dashboardData.totalSalesCurrentMonth)}
           icon={TrendingUp}
@@ -183,7 +217,6 @@ export default function DashboardPage() {
           icon={AlertTriangle}
           changeType={dashboardData.lowStockItems > 0 ? 'negative' : 'positive'}
         />
-        {/* Add more KPI cards as needed */}
       </div>
 
       {/* Charts */}
