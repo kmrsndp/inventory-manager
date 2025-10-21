@@ -1,5 +1,7 @@
 import * as admin from 'firebase-admin';
 import { Member, ImportReport } from './types';
+import { computeDerivedDates } from './parser'; // Import computeDerivedDates
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
@@ -70,27 +72,12 @@ async function mergeMemberData(
   mergedMember.nextDueDate = importedMember.nextDueDate || mergedMember.nextDueDate;
   mergedMember.totalPaid = importedMember.totalPaid || mergedMember.totalPaid;
   mergedMember.importMonth = importedMember.importMonth || mergedMember.importMonth;
-  mergedMember.updatedAt = new Date().toISOString();
+  mergedMember.updatedAt = Timestamp.now(); // Update to Timestamp
 
   // Recompute derived dates based on merged attendance and plan
-  // (This logic should ideally be in a shared utility or re-called from parser)
-  // For now, we'll assume the parser's computeDerivedDates is robust enough to be called again.
-  // However, to avoid circular dependencies or re-implementing, we'll just update the fields directly
-  // based on the latest attendance and plan.
-  // This part needs to be carefully considered if computeDerivedDates is complex.
-  // For simplicity, let's re-run the logic here or ensure it's called after merge.
-  // For now, we'll just update the attendance and let the caller re-compute if needed.
-  // A better approach would be to pass a function to recompute derived dates.
-  // For this implementation, we'll assume the `computeDerivedDates` from `parser.ts` can be used.
-  // However, to avoid direct import from parser.ts, we'll just update the fields that are directly merged.
-  // The derived dates will be recomputed by the caller if necessary.
+  const recomputedMember = computeDerivedDates(mergedMember);
 
-  // For now, let's just update the attendance and let the caller re-compute derived dates.
-  // This is a simplification. A more robust solution would re-compute derived dates here.
-  // For the purpose of this task, we'll assume the `parseExcel` function will handle the final `computeDerivedDates` call.
-  // So, we just need to ensure the `attendance` array is correctly merged.
-
-  return mergedMember;
+  return recomputedMember;
 }
 
 /**
@@ -116,7 +103,13 @@ export async function writeMembersToFirestore(members: Member[], report: ImportR
         batch.set(memberRef, mergedMember, { merge: true });
         report.updated++;
       } else {
-        batch.set(memberRef, importedMember);
+        // Convert ISO strings to Timestamp for new members
+        const newMember: Member = {
+          ...importedMember,
+          createdAt: Timestamp.fromDate(new Date(importedMember.createdAt as unknown as string)),
+          updatedAt: Timestamp.fromDate(new Date(importedMember.updatedAt as unknown as string)),
+        };
+        batch.set(memberRef, newMember);
         report.created++;
       }
 

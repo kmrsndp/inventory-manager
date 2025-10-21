@@ -8,6 +8,7 @@ import { updateMemberStatus } from '@/services/memberService'; // Import updateM
 import { LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import KPICard from '@/components/KPICard';
 import { TrendingUp, Package, AlertTriangle, Users, UserCheck, UserX, UserMinus } from 'lucide-react'; // Add new icons
+import MembersList from '@/components/MembersList'; // Import MembersList
 
 interface SaleData {
   id?: string;
@@ -218,6 +219,9 @@ export default function DashboardPage() {
           changeType={dashboardData.lowStockItems > 0 ? 'negative' : 'positive'}
         />
       </div>
+
+      {/* Members List */}
+      <MembersList />
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

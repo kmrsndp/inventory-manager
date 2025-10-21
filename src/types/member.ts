@@ -16,18 +16,23 @@ export interface Member {
   id: string;
   name: string;
   mobile: string;
-  planType: "Monthly" | "Quarterly" | "Half-Yearly" | "Unknown";
-  startDate: string | null;
+  mobileNormalized: string;
+  planRaw: string | null;
+  planType: "Monthly" | "Quarterly" | "Half-Yearly" | "Yearly" | "Unknown" | null;
   planMonths: number | null;
+  startDate: string | null;
   lastAttendance: string | null;
+  nextExpectedAttendance: string | null;
   nextPaymentDueByPlan: string | null;
-  durationMonths: number | null; // Re-adding durationMonths, can be null if not explicitly set
+  attendedMonths: string[];
+  attendanceCount: number;
   nextDueDate: string | null;
   status: "Active" | "DueSoon" | "Overdue" | "Stopped" | "Unknown";
   totalPaid: number;
   payments: Payment[];
-  conflictInfo?: ConflictInfo;
+  conflictInfo?: ConflictInfo | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  importMonth?: string;
+  importMonth: string;
+  importMonthISO: string;
 }

@@ -22,50 +22,13 @@ import { parse as dfParse, isValid as dfIsValid, addMonths, format as dfFormat }
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AttendanceRow, ManualReviewRow, Diagnostics } from './types';
+import { Member as MemberInterface } from './types'; // Import Member as MemberInterface to avoid naming conflict
 
-export type Member = {
-  id: string;
-  name: string;
-  mobile: string; // raw mobile cell value or 'NA'
-  mobileNormalized: string; // normalized digits or 'NA'
-  planRaw: string | null; // raw token from sheet (e.g., "1M", "3M")
-  planType: string | null;
-  planMonths: number | null;
-  startDate: string | null; // ISO yyyy-mm-dd
-  lastAttendance: string | null; // ISO
-  nextExpectedAttendance: string | null; // ISO
-  nextPaymentDueByPlan: string | null; // ISO
-  attendedMonths: string[]; // YYYY-MM string list
+export interface Member extends MemberInterface {
   attendanceCount: number;
-  importMonth: string; // e.g., FEBRUARY-2023 or UNKNOWN
-  importMonthISO: string; // e.g., 2023-02 or ''
   needsReview?: boolean;
-};
-
-export type AttendanceRow = {
-  member_mobile: string;
-  member_name: string;
-  attendance_date: string; // ISO date
-  attended_month: string; // YYYY-MM
-  import_month: string;
-};
-
-export type ManualReviewRow = {
-  row_index: number;
-  name?: string;
-  mobile_candidate?: string;
-  mobile_normalized?: string;
-  planRaw?: string;
-  importMonth?: string;
-  reason?: string;
-};
-
-export type Diagnostics = {
-  detectedHeaders: { row_idx: number; month: string; year: number }[];
-  planDetection: { bestCol: number | null; counts: [number, number][] };
-  rawRows: number;
-  rawCols: number;
-};
+}
 
 // --- Helpers ---
 
@@ -383,21 +346,32 @@ export function parseExcelToStructured(filePath: string): {
 
     const memberId = mobileNormalized || uuidv4();
     const mapped = mapPlanRaw(planRaw);
+    const now = new Date().toISOString();
+
     if (!membersMap[memberId]) {
       membersMap[memberId] = {
         id: memberId,
         name: name || '',
         mobile: mobileCandidate ? String(mobileCandidate) : 'NA',
         mobileNormalized: mobileNormalized || 'NA',
-        planRaw: planRaw || '',
-        planType: mapped.planType,
-        planMonths: mapped.planMonths,
-        startDate,
+        planRaw: planRaw || null,
+        planType: mapped.planType || 'Unknown',
+        planMonths: mapped.planMonths || null,
+        startDate: startDate || null,
+        nextDueDate: null, // Will be computed later
+        lastAttendance: attDates.length > 0 ? attDates.sort().slice(-1)[0] : null,
+        nextExpectedAttendance: null, // Will be computed later
+        nextPaymentDueByPlan: null, // Will be computed later
         attendance: Array.from(new Set(attDates)).sort(),
         attendedMonths: Array.from(new Set(attDates.map(d => d.slice(0, 7)))).sort(),
-        lastAttendance: attDates.length > 0 ? attDates.sort().slice(-1)[0] : null,
+        totalPaid: null, // No info in Excel
+        conflictInfo: null,
         importMonth: context.importMonth,
         importMonthISO: context.importMonthISO,
+        createdAt: now,
+        updatedAt: now,
+        attendanceCount: attDates.length,
+        needsReview: false, // Add needsReview back as it's part of the local Member type
       };
     } else {
       const ex = membersMap[memberId];
@@ -410,6 +384,8 @@ export function parseExcelToStructured(filePath: string): {
         ex.planType = mm.planType;
         ex.planMonths = mm.planMonths;
       }
+      ex.updatedAt = now;
+      ex.attendanceCount = ex.attendance.length;
     }
 
     if ((!planRaw || mapped.planType === null) || !mobileNormalized) {
@@ -428,39 +404,9 @@ export function parseExcelToStructured(filePath: string): {
   const members: Member[] = [];
   for (const id of Object.keys(membersMap)) {
     const m = membersMap[id];
-    if (m.attendance && m.attendance.length > 0) m.lastAttendance = m.attendance.slice(-1)[0];
-    if (m.lastAttendance) {
-      try {
-        const dt = new Date(m.lastAttendance);
-        m.nextExpectedAttendance = dfFormat(addMonths(dt, 1), 'yyyy-MM-dd');
-        if (m.planMonths) m.nextPaymentDueByPlan = dfFormat(addMonths(dt, m.planMonths), 'yyyy-MM-dd');
-        else m.nextPaymentDueByPlan = null;
-      } catch (e) {
-        m.nextExpectedAttendance = null;
-        m.nextPaymentDueByPlan = null;
-      }
-    } else {
-      m.nextExpectedAttendance = null;
-      m.nextPaymentDueByPlan = null;
-    }
-    members.push({
-      id: m.id,
-      name: m.name,
-      mobile: m.mobile,
-      mobileNormalized: m.mobileNormalized,
-      planRaw: m.planRaw,
-      planType: m.planType || null,
-      planMonths: m.planMonths || null,
-      startDate: m.startDate || null,
-      lastAttendance: m.lastAttendance || null,
-      nextExpectedAttendance: m.nextExpectedAttendance || null,
-      nextPaymentDueByPlan: m.nextPaymentDueByPlan || null,
-      attendedMonths: m.attendedMonths || [],
-      attendanceCount: m.attendance ? m.attendance.length : 0,
-      importMonth: m.importMonth || 'UNKNOWN',
-      importMonthISO: m.importMonthISO || '',
-      needsReview: false,
-    });
+    // Recompute derived dates
+    const recomputedMember = computeDerivedDates(m);
+    members.push(recomputedMember);
   }
 
   const diagnostics: Diagnostics = {
@@ -468,6 +414,9 @@ export function parseExcelToStructured(filePath: string): {
     planDetection: { bestCol: bestPlanCol, counts: colCounts.map(x => [x.col, x.count]) },
     rawRows: rowsCount,
     rawCols: colsCount,
+    totalRows: rawRows.length, // Initialize with total rows read
+    parsedRows: members.length, // Number of members successfully parsed
+    skippedRows: rawRows.length - members.length - manualReview.length, // Approximation
   };
 
   return { members, attendance, manualReview, diagnostics };
@@ -489,4 +438,37 @@ if (require.main === module) {
   fs.writeFileSync(path.join(outDir, 'manual_review.json'), JSON.stringify(manualReview, null, 2), 'utf8');
   fs.writeFileSync(path.join(outDir, 'diagnostics.json'), JSON.stringify(diagnostics, null, 2), 'utf8');
   console.log('Parsed output saved to parsed_output/');
+}
+
+export function computeDerivedDates(member: Member): Member {
+  const m: Member = { ...member }; // Create a mutable copy and explicitly cast to Member
+
+  if (m.attendance && m.attendance.length > 0) {
+    m.lastAttendance = m.attendance.slice(-1)[0];
+  } else {
+    m.lastAttendance = null;
+  }
+
+  if (m.lastAttendance) {
+    try {
+      const dt = new Date(m.lastAttendance);
+      m.nextExpectedAttendance = dfFormat(addMonths(dt, 1), 'yyyy-MM-dd');
+      if (m.planMonths) {
+        m.nextPaymentDueByPlan = dfFormat(addMonths(dt, m.planMonths), 'yyyy-MM-dd');
+      } else {
+        m.nextPaymentDueByPlan = null;
+      }
+    } catch (e) {
+      m.nextExpectedAttendance = null;
+      m.nextPaymentDueByPlan = null;
+    }
+  } else {
+    m.nextExpectedAttendance = null;
+    m.nextPaymentDueByPlan = null;
+  }
+
+  // Ensure attendanceCount is updated
+  m.attendanceCount = m.attendance ? m.attendance.length : 0;
+
+  return m;
 }
