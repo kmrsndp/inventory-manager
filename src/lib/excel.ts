@@ -129,7 +129,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
                   } else {
                     // Try parsing common date formats if ISO fails
                     const commonFormats = ['MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
-                    for (const _ of commonFormats) { // Renamed to _ to indicate it's intentionally unused
+                    for (const _formatStr of commonFormats) {
                       const parsed = new Date(value); // Simple Date constructor for flexibility
                       if (isValidDate(parsed)) {
                         date = parsed;
@@ -157,7 +157,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
                     dueDate = parsedDate;
                   } else {
                     const commonFormats = ['MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
-                    for (const _ of commonFormats) { // Renamed to _ to indicate it's intentionally unused
+                    for (const _formatStr of commonFormats) {
                       const parsed = new Date(value);
                       if (isValidDate(parsed)) {
                         dueDate = parsed;

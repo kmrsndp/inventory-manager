@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Member, Payment } from '@/types/member';
-import { X, Plus, Edit, Trash2, Clock, List, User } from 'lucide-react';
-import { format, parseISO, isBefore, addDays } from 'date-fns';
-import { updateMember, deleteMember } from '@/services/memberService'; // Assuming these exist or will be created
+import { X, Plus, Edit, Trash2, Clock, List, User } from 'lucide-react'; // Combined imports
+import { format, parseISO, isBefore, addMonths } from 'date-fns'; // Keep addMonths for planMonths calculation
+import { updateMember, deleteMember } from '@/services/memberService';
 import toast from 'react-hot-toast';
-import ConfirmMemberDeleteDialog from './ConfirmMemberDeleteDialog'; // Using new dialog
+import ConfirmMemberDeleteDialog from './ConfirmMemberDeleteDialog';
 
 interface MemberModalProps {
   member: Member | null;
   onClose: () => void;
-  onMemberUpdated: () => void; // Callback to refresh member list
+  onSave: (updatedMember: Member) => Promise<void>; // Use onSave prop
 }
 
-export default function MemberModal({ member, onClose, onMemberUpdated }: MemberModalProps) {
+export default function MemberModal({ member, onClose, onSave }: MemberModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedMember, setEditedMember] = useState<Member | null>(null);
   const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
@@ -34,12 +34,12 @@ export default function MemberModal({ member, onClose, onMemberUpdated }: Member
     const { name, value } = e.target;
     setEditedMember(prev => {
       if (!prev) return null;
-      if (name === 'durationMonths') {
-        const duration = parseInt(value, 10);
-        const newNextDueDate = prev.startDate && !isNaN(duration)
-          ? format(addDays(parseISO(prev.startDate), duration * 30), 'yyyy-MM-dd') // Approximation for months
+      if (name === 'planMonths') { // Keep planMonths logic
+        const planMonths = parseInt(value, 10);
+        const newNextPaymentDueByPlan = prev.lastAttendance && !isNaN(planMonths)
+          ? format(addMonths(parseISO(prev.lastAttendance), planMonths), 'yyyy-MM-dd')
           : null;
-        return { ...prev, [name]: isNaN(duration) ? null : duration, nextDueDate: newNextDueDate };
+        return { ...prev, [name]: isNaN(planMonths) ? null : planMonths, nextPaymentDueByPlan: newNextPaymentDueByPlan };
       }
       return { ...prev, [name]: value };
     });
@@ -48,13 +48,11 @@ export default function MemberModal({ member, onClose, onMemberUpdated }: Member
   const handleSave = async () => {
     if (!editedMember) return;
     try {
-      await updateMember(editedMember.id, editedMember);
-      toast.success('Member updated successfully!');
-      onMemberUpdated();
+      await onSave(editedMember); // Use the onSave prop
       setIsEditing(false);
     } catch (error) {
-      console.error('Failed to update member:', error);
-      toast.error('Failed to update member.');
+      console.error('Failed to save member:', error);
+      toast.error('Failed to save member.');
     }
   };
 
@@ -76,7 +74,6 @@ export default function MemberModal({ member, onClose, onMemberUpdated }: Member
     try {
       await updateMember(editedMember.id, updatedMemberWithPayment);
       toast.success('Payment added successfully!');
-      onMemberUpdated();
       setShowAddPaymentForm(false);
       setNewPayment({ date: format(new Date(), 'yyyy-MM-dd'), amount: 0, method: '' });
       setEditedMember(updatedMemberWithPayment); // Update local state immediately
@@ -91,8 +88,7 @@ export default function MemberModal({ member, onClose, onMemberUpdated }: Member
     try {
       await deleteMember(member.id);
       toast.success('Member deleted successfully!');
-      onMemberUpdated();
-      onClose();
+      onClose(); // Close the modal after deletion
     } catch (error) {
       console.error('Failed to delete member:', error);
       toast.error('Failed to delete member.');
@@ -159,36 +155,32 @@ export default function MemberModal({ member, onClose, onMemberUpdated }: Member
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Duration (Months)</label>
+              <label className="block text-sm font-medium text-gray-700">Plan Months</label>
               {isEditing ? (
                 <input
                   type="number"
-                  name="durationMonths"
-                  value={editedMember?.durationMonths || ''}
+                  name="planMonths"
+                  value={editedMember?.planMonths || ''}
                   onChange={handleInputChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900"
                 />
               ) : (
                 <p className="mt-1 block w-full px-3 py-2 bg-gray-50 rounded-md border border-gray-300 text-gray-900 sm:text-sm">
-                  {editedMember?.durationMonths || 'N/A'}
+                  {editedMember?.planMonths || 'N/A'}
                 </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Next Due Date</label>
-              {isEditing ? (
-                <input
-                  type="date"
-                  name="nextDueDate"
-                  value={editedMember?.nextDueDate || ''}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900"
-                />
-              ) : (
-                <p className="mt-1 block w-full px-3 py-2 bg-gray-50 rounded-md border border-gray-300 text-gray-900 sm:text-sm">
-                  {editedMember?.nextDueDate ? format(parseISO(editedMember.nextDueDate), 'dd-MMM-yyyy') : 'N/A'}
-                </p>
-              )}
+              <label className="block text-sm font-medium text-gray-700">Last Attendance</label>
+              <p className="mt-1 block w-full px-3 py-2 bg-gray-50 rounded-md border border-gray-300 text-gray-900 sm:text-sm">
+                {editedMember?.lastAttendance ? format(parseISO(editedMember.lastAttendance), 'dd-MMM-yyyy') : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Next Payment Due</label>
+              <p className="mt-1 block w-full px-3 py-2 bg-gray-50 rounded-md border border-gray-300 text-gray-900 sm:text-sm">
+                {editedMember?.nextPaymentDueByPlan ? format(parseISO(editedMember.nextPaymentDueByPlan), 'dd-MMM-yyyy') : 'N/A'}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Total Paid</label>

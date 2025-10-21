@@ -12,8 +12,25 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { format, isBefore, isAfter, subDays, parseISO } from 'date-fns';
+import { onSnapshot } from 'firebase/firestore';
 
 const membersCollection = collection(db, 'members');
+
+export const onMembersChange = (
+  userId: string,
+  callback: (members: Member[]) => void,
+  onError: (error: Error) => void
+) => {
+  const q = query(membersCollection, where('userId', '==', userId)); // Assuming members are tied to a userId
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Member[];
+    callback(members);
+  }, (error) => {
+    console.error("Error fetching real-time members:", error);
+    onError(error);
+  });
+  return unsubscribe;
+};
 
 export const getMemberByMobile = async (mobile: string): Promise<Member | null> => {
   const q = query(membersCollection, where('mobile', '==', mobile));
@@ -42,10 +59,13 @@ export const importMembers = async (members: Partial<Member>[]) => {
           name: member.name, // Update name as well
           planType: member.planType,
           startDate: member.startDate,
+          planMonths: member.planMonths,
+          lastAttendance: member.lastAttendance,
+          nextPaymentDueByPlan: member.nextPaymentDueByPlan,
           nextDueDate: member.nextDueDate,
           status: member.status, // Update status if provided
           updatedAt: Timestamp.now(),
-          importMonth: member.importMonth,
+          importMonth: member.importMonth || 'UNKNOWN',
         };
 
         // Only update conflictInfo if there's a name mismatch
@@ -61,18 +81,27 @@ export const importMembers = async (members: Partial<Member>[]) => {
         const newMemberRef = doc(membersCollection);
         const newMember: Member = {
           id: newMemberRef.id,
-          name: member.name || 'Unknown', // Default name if missing
-          mobile: member.mobile!, // Mobile should always be present due to earlier check
-          planType: member.planType || 'Unknown', // Default planType
-          startDate: member.startDate || format(new Date(), 'yyyy-MM-dd'), // Default startDate
-          durationMonths: 0, // Not directly used from Excel anymore
-          nextDueDate: member.nextDueDate || null, // Can be null
-          status: member.status || 'Active', // Default status
-          totalPaid: 0,
-          payments: [],
+          name: member.name || 'Unknown',
+          mobile: member.mobile!,
+          mobileNormalized: member.mobileNormalized || member.mobile!, // Use mobile as fallback
+          planRaw: member.planRaw || null,
+          planType: member.planType || 'Unknown',
+          planMonths: member.planMonths || null,
+          startDate: member.startDate || format(new Date(), 'yyyy-MM-dd'),
+          lastAttendance: member.lastAttendance || null,
+          nextExpectedAttendance: member.nextExpectedAttendance || null,
+          nextPaymentDueByPlan: member.nextPaymentDueByPlan || null,
+          attendedMonths: member.attendedMonths || [],
+          attendanceCount: member.attendanceCount || 0,
+          nextDueDate: member.nextDueDate || null,
+          status: member.status || 'Active',
+          totalPaid: member.totalPaid || 0,
+          payments: member.payments || [],
+          conflictInfo: member.conflictInfo || null,
           createdAt: Timestamp.now(),
           updatedAt: Timestamp.now(),
-          importMonth: member.importMonth,
+          importMonth: member.importMonth || 'UNKNOWN',
+          importMonthISO: member.importMonthISO || '',
         };
         batch.set(newMemberRef, newMember);
       }
