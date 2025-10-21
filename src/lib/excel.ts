@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { Member } from '@/types/member';
 import { v4 as uuidv4 } from 'uuid';
 import { Timestamp } from 'firebase/firestore';
-import { addMonths, format, isValid, parseISO } from 'date-fns';
+import { addMonths, format, parseISO } from 'date-fns';
 
 // Define a more robust header mapping
 const columnToFieldMapping: { [key: string]: keyof Member | 'NO. OF MONTHS' | 'DUE DATE' | 'CONTACT' | 'START DATE' | 'STATUS' } = {
@@ -102,7 +102,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
           let planDurationMonths: number = 0; // To store duration for calculation
 
           headers.forEach((header, index) => {
-            let value: string | number | null = row[index];
+            const value: string | number | null = row[index];
 
             switch (header) {
               case 'name':
@@ -129,7 +129,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
                   } else {
                     // Try parsing common date formats if ISO fails
                     const commonFormats = ['MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
-                    for (const fmt of commonFormats) {
+                    for (const _ of commonFormats) { // Renamed to _ to indicate it's intentionally unused
                       const parsed = new Date(value); // Simple Date constructor for flexibility
                       if (isValidDate(parsed)) {
                         date = parsed;
@@ -157,7 +157,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
                     dueDate = parsedDate;
                   } else {
                     const commonFormats = ['MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd'];
-                    for (const fmt of commonFormats) {
+                    for (const _ of commonFormats) { // Renamed to _ to indicate it's intentionally unused
                       const parsed = new Date(value);
                       if (isValidDate(parsed)) {
                         dueDate = parsed;

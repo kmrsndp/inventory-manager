@@ -42,6 +42,9 @@ export const importMembers = async (members: Partial<Member>[]) => {
           name: member.name, // Update name as well
           planType: member.planType,
           startDate: member.startDate,
+          planMonths: member.planMonths,
+          lastAttendance: member.lastAttendance,
+          nextPaymentDueByPlan: member.nextPaymentDueByPlan,
           nextDueDate: member.nextDueDate,
           status: member.status, // Update status if provided
           updatedAt: Timestamp.now(),
@@ -65,7 +68,10 @@ export const importMembers = async (members: Partial<Member>[]) => {
           mobile: member.mobile!, // Mobile should always be present due to earlier check
           planType: member.planType || 'Unknown', // Default planType
           startDate: member.startDate || format(new Date(), 'yyyy-MM-dd'), // Default startDate
-          durationMonths: 0, // Not directly used from Excel anymore
+          planMonths: member.planMonths || null,
+          lastAttendance: member.lastAttendance || null,
+          nextPaymentDueByPlan: member.nextPaymentDueByPlan || null,
+          durationMonths: null, // Not directly used from Excel anymore
           nextDueDate: member.nextDueDate || null, // Can be null
           status: member.status || 'Active', // Default status
           totalPaid: 0,

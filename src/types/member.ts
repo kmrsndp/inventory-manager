@@ -18,6 +18,9 @@ export interface Member {
   mobile: string;
   planType: "Monthly" | "Quarterly" | "Half-Yearly" | "Unknown";
   startDate: string | null;
+  planMonths: number | null;
+  lastAttendance: string | null;
+  nextPaymentDueByPlan: string | null;
   durationMonths: number | null; // Re-adding durationMonths, can be null if not explicitly set
   nextDueDate: string | null;
   status: "Active" | "DueSoon" | "Overdue" | "Stopped" | "Unknown";
