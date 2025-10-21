@@ -20,13 +20,13 @@ const MONTH_NAMES = [
 ];
 
 // Flexible date parse
-function tryParseDateFlex(cell: any): string | null {
+function tryParseDateFlex(cell: unknown): string | null {
   if (cell === undefined || cell === null) return null;
   if (typeof cell === "number") {
     try {
       const d = XLSX.SSF.parse_date_code(cell);
       if (d && d.y) return new Date(d.y, d.m - 1, d.d).toISOString().slice(0, 10);
-    } catch (e) { /* fallback */ }
+    } catch { /* fallback */ }
   }
   const s = String(cell).trim();
   if (!s || /^x+$/i.test(s)) return null;
@@ -41,8 +41,11 @@ function tryParseDateFlex(cell: any): string | null {
     let p3 = parseInt(partsSlash[2], 10);
     if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
       if (p3 < 100) p3 += (p3 > 50 ? 1900 : 2000);
-      let day = p1, month = p2, year = p3;
-      if (p1 > 12) { day = p2; month = p1; }
+      let day = p1; let month = p2; const year = p3;
+      if (p1 > 12) {
+        day = p2;
+        month = p1;
+      }
       const d = new Date(year, month - 1, day);
       if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
     }
@@ -66,7 +69,7 @@ function tryParseDateFlex(cell: any): string | null {
 }
 
 // Normalize mobile -> returns normalized 10-digit string OR null
-function normalizeMobileFlexible(value: any): string | null {
+function normalizeMobileFlexible(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   const s = String(value);
   const digits = s.replace(/\D/g, "");
@@ -83,7 +86,7 @@ function normalizeMobileFlexible(value: any): string | null {
 }
 
 // boolean check if a cell is plausibly a phone
-function isLikelyMobile(value: any): boolean {
+function isLikelyMobile(value: unknown): boolean {
   if (value === undefined || value === null) return false;
   const digits = String(value).replace(/\D/g, "");
   // treat anything 8-13 digits as likely phone (covers missing leading 0/country code)
@@ -119,7 +122,7 @@ function detectMonthInRow(row: (string|number)[]): string | null {
   return null;
 }
 
-function parsePlanToken(token: any): { planType: Member["planType"] | null; planMonths: number | null } {
+function parsePlanToken(token: unknown): { planType: Member["planType"] | null; planMonths: number | null } {
   if (token === undefined || token === null) return { planType: null, planMonths: null };
   const s = String(token).toUpperCase().replace(/\s+/g, "").replace(/MONTHS?/g, "M").replace(/MTHS?/g, "M");
   if (/^X+$/.test(s) || s === "NA" || s === "N/A") return { planType: null, planMonths: null };
@@ -213,17 +216,17 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
 
           if (row.every(c => String(c).trim() === "")) continue;
 
-          const rowObj: Record<string, any> = {};
+          const rowObj: Record<string, unknown> = {};
           for (let c = 0; c < rawHeaders.length; c++) {
             rowObj[rawHeaders[c] || `COL_${c}`] = row[c];
           }
 
           // name candidate (make it a let so we can swap safely)
-          let nameCand: any = rowObj["NAME"] || rowObj["MEMBER"] || rowObj["MEMBER NAME"] || row[1] || row[0] || "";
+          let nameCand: string | number | null = rowObj["NAME"] || rowObj["MEMBER"] || rowObj["MEMBER NAME"] || row[1] || row[0] || "";
           nameCand = String(nameCand || "").trim();
 
           // attempt to get a mobile candidate from guessed column
-          let mobileCand: any = (guessedMobileCol !== null && guessedMobileCol < row.length) ? row[guessedMobileCol] : null;
+          let mobileCand: string | number | null = (guessedMobileCol !== null && guessedMobileCol < row.length) ? row[guessedMobileCol] : null;
 
           // fallback: scan first 12 columns for digit-ish value
           if (!mobileCand) {
@@ -235,7 +238,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
 
           // fallback to named header columns
           if (!mobileCand) {
-            mobileCand = rowObj["CONTACT"] || rowObj["CONTACT NO"] || rowObj["MOBILE"] || null;
+            mobileCand = (rowObj["CONTACT"] || rowObj["CONTACT NO"] || rowObj["MOBILE"] || null) as string | number | null;
           }
 
           // If mobileCand looks like a name and nameCand looks like a phone, swap them.

@@ -5,24 +5,11 @@ import {
   getDocs,
   query,
   writeBatch,
-  setDoc,
   updateDoc,
   deleteDoc,
 } from "firebase/firestore";
 
-export interface Member {
-  id: string;
-  name: string;
-  mobile?: string;
-  mobileNormalized?: string;
-  planType?: string;
-  planRaw?: string;
-  startDate?: string;
-  endDate?: string;
-  lastAttendance?: string | null;
-  createdAt?: string;
-  status?: string;
-}
+import { Member as MemberType } from "@/types/member";
 
 /**
  * Normalize mobile number and fallback to 'NA' when missing/invalid
@@ -35,7 +22,7 @@ function normalizeMobile(mobile: string | undefined): string {
 /**
  * Import members in safe Firestore batches (max 400 ops per batch)
  */
-export async function importMembers(members: Member[]) {
+export async function importMembers(members: MemberType[]) {
   console.log(`🚀 Starting import for ${members.length} members`);
 
   let processed = 0;
@@ -43,7 +30,7 @@ export async function importMembers(members: Member[]) {
   let batch = writeBatch(db);
   let opCount = 0;
 
-  for (const [i, member] of members.entries()) {
+  for (const [_i, member] of members.entries()) {
     try {
       const normalizedMobile = normalizeMobile(member.mobile);
 
@@ -84,19 +71,19 @@ export async function importMembers(members: Member[]) {
 /**
  * Fetch all members
  */
-export async function getMembers(): Promise<Member[]> {
+export async function getMembers(): Promise<MemberType[]> {
   const q = query(collection(db, "members"));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({
     id: d.id,
     ...d.data(),
-  })) as Member[];
+  })) as MemberType[];
 }
 
 /**
  * Update a member record (used by MemberModal)
  */
-export async function updateMember(id: string, data: Partial<Member>) {
+export async function updateMember(id: string, data: Partial<MemberType>) {
   const ref = doc(db, "members", id);
   await updateDoc(ref, data);
   console.log(`🟢 Member ${id} updated`, data);

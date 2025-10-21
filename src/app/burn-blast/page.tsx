@@ -84,7 +84,7 @@ export default function BurnBlastPage() {
       await importWithTimeout(importMembers(validMembers), 2 * 60 * 1000);
       toast.success(`✅ Members imported: ${validMembers.length}`, { id: toastId });
       await fetchMembers();
-    } catch (err: any) {
+    } catch (err: Error) {
       console.error("Import failed:", err);
       toast.error(`Import failed: ${err?.message || err}`, { id: toastId });
     } finally {

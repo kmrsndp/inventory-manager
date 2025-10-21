@@ -55,7 +55,7 @@ function tryParseDate(cell: unknown): string | null {
         const iso = new Date(d.y, d.m - 1, d.d).toISOString().slice(0, 10);
         return iso;
       }
-    } catch (_error) {
+    } catch (_e) {
       // fallthrough
     }
   }
@@ -467,7 +467,7 @@ export function computeDerivedDates(member: Member): Member {
         m.nextPaymentDueByPlan = null;
         m.nextDueDate = null;
       }
-    } catch (_error) {
+    } catch (_e) {
       m.nextExpectedAttendance = null;
       m.nextPaymentDueByPlan = null;
       m.nextDueDate = null;
