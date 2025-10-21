@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react'; // Re-add React hooks imports
+import { useState, useEffect, useRef } from 'react';
 import { Upload, MoreVertical } from 'lucide-react';
 import { Member } from '@/types/member';
 import { parseExcelData } from '@/lib/excel';
@@ -8,6 +8,7 @@ import { importMembers, getMembers, updateMemberStatus } from '@/services/member
 import toast, { Toaster } from 'react-hot-toast';
 import MemberModal from '@/components/MemberModal';
 import { format, parseISO, isBefore } from 'date-fns';
+import { updateMember } from '@/services/memberService'; // Import updateMember
 
 export default function BurnBlastPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -62,6 +63,17 @@ export default function BurnBlastPage() {
     setSelectedMember(null);
   };
 
+  const handleSaveMember = async (updatedMember: Member) => {
+    try {
+      await updateMember(updatedMember.id, updatedMember);
+      toast.success('Member updated successfully!');
+      fetchMembers(); // Refresh the list after update
+      handleCloseModal();
+    } catch (error) {
+      console.error('Failed to update member:', error);
+      toast.error('Failed to update member.');
+    }
+  };
 
   return (
     <div className="p-8">
@@ -148,7 +160,7 @@ export default function BurnBlastPage() {
       <MemberModal
         member={selectedMember}
         onClose={handleCloseModal}
-        onMemberUpdated={fetchMembers} // Pass fetchMembers to refresh the list after updates/deletes
+        onSave={handleSaveMember} // Pass handleSaveMember to the modal
       />
     </div>
   );
