@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuardWrapper from '@/components/Auth/AuthGuardWrapper';
 import { getSales, getProducts } from '@/services/firestoreService';
-import { updateMemberStatus } from '@/services/memberService'; // Import updateMemberStatus
+import { getMembers } from '@/services/memberService';
 import { LineChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import KPICard from '@/components/KPICard';
 import { TrendingUp, Package, AlertTriangle, Users, UserCheck, UserX, UserMinus } from 'lucide-react'; // Add new icons
@@ -46,14 +46,19 @@ export default function DashboardPage() {
       setLoadingData(true);
       setError(null);
       try {
-        const [fetchedSales, fetchedProducts, fetchedMemberStats] = await Promise.all([
+        const [fetchedSales, fetchedProducts, allMembers] = await Promise.all([
           getSales(user.uid) as Promise<SaleData[]>,
           getProducts(user.uid) as Promise<ProductData[]>,
-          updateMemberStatus(), // Fetch member stats
+          getMembers(),
         ]);
         setSales(fetchedSales);
         setProducts(fetchedProducts);
-        setMemberStats(fetchedMemberStats);
+
+        const totalMembers = allMembers.length;
+        const activeCount = allMembers.filter(m => m.status === 'Active').length;
+        const dueSoonCount = allMembers.filter(m => m.status === 'DueSoon').length;
+        const overdueCount = allMembers.filter(m => m.status === 'Overdue').length;
+        setMemberStats({ totalMembers, activeCount, dueSoonCount, overdueCount });
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
         setError("Failed to load dashboard data.");

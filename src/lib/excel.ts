@@ -222,7 +222,7 @@ export const parseExcelData = (file: File): Promise<Partial<Member>[]> => {
           }
 
           // name candidate (make it a let so we can swap safely)
-          let nameCand: string | number | null = rowObj["NAME"] || rowObj["MEMBER"] || rowObj["MEMBER NAME"] || row[1] || row[0] || "";
+          let nameCand: string | number | null = (rowObj["NAME"] || rowObj["MEMBER"] || rowObj["MEMBER NAME"] || row[1] || row[0] || "") as string | number | null;
           nameCand = String(nameCand || "").trim();
 
           // attempt to get a mobile candidate from guessed column

@@ -30,7 +30,7 @@ export async function importMembers(members: MemberType[]) {
   let batch = writeBatch(db);
   let opCount = 0;
 
-  for (const [_i, member] of members.entries()) {
+  for (const [, member] of members.entries()) {
     try {
       const normalizedMobile = normalizeMobile(member.mobile);
 

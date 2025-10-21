@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { onMembersChange, updateMember, deleteMember } from '@/services/memberService';
+import { updateMember, deleteMember } from '@/services/memberService';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Member } from '@/types/member';
 import { Pencil, Trash2 } from 'lucide-react';
 import MemberModal from './MemberModal'; // Assuming a modal for editing members
@@ -18,15 +20,25 @@ export default function MembersList() {
 
   useEffect(() => {
     if (user) {
-      setLoading(true);
-      const unsubscribe = onMembersChange(user.uid, (fetchedMembers: Member[]) => {
+      const membersCollection = collection(db, 'members');
+      const q = query(membersCollection, orderBy('createdAt', 'desc'));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedMembers: Member[] = snapshot.docs.map(doc => {
+          const data = doc.data() as Member;
+          return {
+            ...data,
+            id: doc.id, // Ensure doc.id is used as the primary ID
+          };
+        });
         setMembers(fetchedMembers);
         setLoading(false);
-      }, (err: Error) => {
-        console.error("Failed to fetch members:", err);
+      }, (error) => {
+        console.error("Error fetching members:", error);
+        toast.error("Failed to load members.");
         setLoading(false);
-        toast.error('Failed to load members.');
       });
+
       return () => unsubscribe();
     }
   }, [user]);
