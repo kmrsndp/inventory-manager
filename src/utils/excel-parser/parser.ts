@@ -92,6 +92,12 @@ function tryParseDate(cell: unknown): string | null {
 function mapPlanRaw(pr: string | null): { planType: 'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Yearly' | null; planMonths: number | null } {
   if (!pr) return { planType: null, planMonths: null };
   const s = String(pr).toUpperCase().replace(/\s+/g, '').replace(/MONTHS?|MTHS?/g, 'M');
+
+  // Explicitly handle "xxxxxxxxxxxx" or similar masking values
+  if (s.includes('X') || s.includes('N/A') || s === 'UNKNOWN') {
+    return { planType: null, planMonths: null };
+  }
+
   const digits = s.replace(/\D/g, '');
   switch (digits) {
     case '1': return { planType: 'Monthly', planMonths: 1 };
@@ -454,17 +460,22 @@ export function computeDerivedDates(member: Member): Member {
       const dt = new Date(m.lastAttendance);
       m.nextExpectedAttendance = dfFormat(addMonths(dt, 1), 'yyyy-MM-dd');
       if (m.planMonths) {
-        m.nextPaymentDueByPlan = dfFormat(addMonths(dt, m.planMonths), 'yyyy-MM-dd');
+        const nextPaymentDate = addMonths(dt, m.planMonths);
+        m.nextPaymentDueByPlan = dfFormat(nextPaymentDate, 'yyyy-MM-dd');
+        m.nextDueDate = dfFormat(nextPaymentDate, 'yyyy-MM-dd'); // Set nextDueDate here
       } else {
         m.nextPaymentDueByPlan = null;
+        m.nextDueDate = null;
       }
     } catch (_error) {
       m.nextExpectedAttendance = null;
       m.nextPaymentDueByPlan = null;
+      m.nextDueDate = null;
     }
   } else {
     m.nextExpectedAttendance = null;
     m.nextPaymentDueByPlan = null;
+    m.nextDueDate = null;
   }
 
   // Ensure attendanceCount is updated
