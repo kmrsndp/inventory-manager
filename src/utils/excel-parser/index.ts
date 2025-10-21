@@ -1,6 +1,6 @@
-import { parseExcel } from './parser';
+import { parseExcelToStructured } from './parser';
 import { writeMembersToFirestore } from './firestore';
-import { ImportReport } from './types';
+import { ImportReport, Diagnostics, Member, ManualReviewRow, AttendanceRow } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,7 +13,18 @@ import * as path from 'path';
 export async function importExcelToFirestore(filePath: string, outputDir: string = './imports'): Promise<ImportReport> {
   console.log(`Starting Excel import for file: ${filePath}`);
 
-  const { members, report } = await parseExcel(filePath);
+  const { members, attendance, manualReview, diagnostics } = parseExcelToStructured(filePath);
+
+  const report: ImportReport = {
+    totalRows: diagnostics.totalRows,
+    parsedRows: diagnostics.parsedRows,
+    created: 0, // Will be updated by writeMembersToFirestore
+    updated: 0, // Will be updated by writeMembersToFirestore
+    skipped: diagnostics.skippedRows,
+    conflicts: [], // Will be updated by writeMembersToFirestore
+    errors: [], // Will be updated by writeMembersToFirestore
+  };
+
   console.log(`Parsed ${report.parsedRows} rows. Found ${members.length} members to process.`);
 
   // Save raw parsed JSON for audit

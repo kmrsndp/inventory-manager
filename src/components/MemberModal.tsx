@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Member, Payment } from '@/types/member';
-import { X, Plus, Edit, Trash2, Clock, List, User, Calendar, DollarSign } from 'lucide-react'; // Combined imports
+import { X, Plus, Edit, Trash2, Clock, List, User } from 'lucide-react'; // Combined imports
 import { format, parseISO, isBefore, addMonths } from 'date-fns'; // Keep addMonths for planMonths calculation
 import { updateMember, deleteMember } from '@/services/memberService';
 import toast from 'react-hot-toast';

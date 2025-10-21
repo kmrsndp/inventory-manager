@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 interface ManualReviewItem {
   row_index: number;
@@ -13,6 +12,23 @@ interface ManualReviewItem {
   reason?: string;
 }
 
+interface DetectedHeader {
+  month: string;
+  year: number;
+}
+
+interface PlanDetection {
+  bestCol: number | null;
+}
+
+interface Diagnostics {
+  totalRows: number;
+  parsedRows: number;
+  skippedRows: number;
+  detectedHeaders: DetectedHeader[];
+  planDetection: PlanDetection;
+}
+
 export default function ImportPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,9 +38,8 @@ export default function ImportPage() {
   const [importSummary, setImportSummary] = useState<{
     membersCount: number;
     manualReviewCount: number;
-    diagnostics: any; // Adjust type as per Diagnostics interface
+    diagnostics: Diagnostics;
   } | null>(null);
-  const router = useRouter();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -72,9 +87,13 @@ export default function ImportPage() {
       } else {
         setError(result.error || 'Failed to process file.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error:', err);
-      setError(err.message || 'An unexpected error occurred.');
+      if (err instanceof Error) {
+        setError(err.message || 'An unexpected error occurred.');
+      } else {
+        setError('An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }
@@ -131,7 +150,7 @@ export default function ImportPage() {
               <p>Total Rows in Excel: {importSummary.diagnostics.totalRows}</p>
               <p>Parsed Rows: {importSummary.diagnostics.parsedRows}</p>
               <p>Skipped Rows: {importSummary.diagnostics.skippedRows}</p>
-              <p>Detected Headers: {importSummary.diagnostics.detectedHeaders.map((h: any) => `${h.month}-${h.year}`).join(', ')}</p>
+              <p>Detected Headers: {importSummary.diagnostics.detectedHeaders.map((h: DetectedHeader) => `${h.month}-${h.year}`).join(', ')}</p>
               <p>Best Plan Column: {importSummary.diagnostics.planDetection.bestCol !== null ? `Column ${importSummary.diagnostics.planDetection.bestCol + 1}` : 'N/A'}</p>
             </div>
           )}

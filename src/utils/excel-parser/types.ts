@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 
 export interface Member {
   id: string;
@@ -18,8 +17,9 @@ export interface Member {
   totalPaid: number | null;
   conflictInfo: { previousName?: string; importedName?: string; note?: string } | null;
   importMonth: string | null;
-  createdAt: Timestamp; // Changed to Timestamp
-  updatedAt: Timestamp; // Changed to Timestamp
+  importMonthISO: string; // Added to Member interface
+  createdAt: string; // Changed to string to match parser.ts
+  updatedAt: string; // Changed to string to match parser.ts
   attendanceCount: number; // Added to Member interface
 }
 
@@ -30,7 +30,7 @@ export interface ImportReport {
   updated: number;
   skipped: number;
   conflicts: { mobile: string; existingName: string; importedName: string; rowNumber: number }[];
-  errors: any[]; // Added for error reporting
+  errors: unknown[]; // Added for error reporting
 }
 
 export interface AttendanceRow {
@@ -62,5 +62,5 @@ export interface Diagnostics {
 }
 
 export interface ParsedRow {
-  [key: string]: any;
+  [key: string]: unknown;
 }

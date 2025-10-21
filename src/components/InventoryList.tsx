@@ -159,7 +159,7 @@ export default function InventoryList() {
       )}
       {deletingItem && (
         <ConfirmDeleteDialog
-          item={deletingItem as InventoryItem} // Cast to InventoryItem as it's guaranteed not null here
+          item={{ id: deletingItem.id!, name: deletingItem['Item Name'] }}
           onConfirm={async () => {
             if (!user || !deletingItem.id) return;
             try {

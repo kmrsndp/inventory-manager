@@ -18,7 +18,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { parse as dfParse, isValid as dfIsValid, addMonths, format as dfFormat } from 'date-fns';
+import { addMonths, format as dfFormat } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,7 +32,7 @@ export interface Member extends MemberInterface {
 
 // --- Helpers ---
 
-function normalizeMobile(s: any): string | null {
+function normalizeMobile(s: unknown): string | null {
   if (s === undefined || s === null) return null;
   const str = String(s);
   const digits = str.replace(/\D/g, '');
@@ -44,7 +44,7 @@ function normalizeMobile(s: any): string | null {
   return null;
 }
 
-function tryParseDate(cell: any): string | null {
+function tryParseDate(cell: unknown): string | null {
   if (cell === undefined || cell === null) return null;
   // Excel serial number: if number and integer-like > 18000 treat specially
   if (typeof cell === 'number') {
@@ -55,7 +55,7 @@ function tryParseDate(cell: any): string | null {
         const iso = new Date(d.y, d.m - 1, d.d).toISOString().slice(0, 10);
         return iso;
       }
-    } catch (e) {
+    } catch (_error) {
       // fallthrough
     }
   }
@@ -89,7 +89,7 @@ function tryParseDate(cell: any): string | null {
   return null;
 }
 
-function mapPlanRaw(pr: string | null): { planType: string | null; planMonths: number | null } {
+function mapPlanRaw(pr: string | null): { planType: 'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Yearly' | null; planMonths: number | null } {
   if (!pr) return { planType: null, planMonths: null };
   const s = String(pr).toUpperCase().replace(/\s+/g, '').replace(/MONTHS?|MTHS?/g, 'M');
   const digits = s.replace(/\D/g, '');
@@ -104,7 +104,7 @@ function mapPlanRaw(pr: string | null): { planType: string | null; planMonths: n
 
 // Detect month header in a row
 const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
-function detectMonthHeaderInRow(rowValues: any[]): string | null {
+function detectMonthHeaderInRow(rowValues: unknown[]): string | null {
   if (!Array.isArray(rowValues)) {
     return null;
   }
@@ -118,7 +118,7 @@ function detectMonthHeaderInRow(rowValues: any[]): string | null {
   return null;
 }
 
-function isColumnHeaderRow(row: any[]): boolean {
+function isColumnHeaderRow(row: unknown[]): boolean {
   if (!Array.isArray(row)) return false;
   const headerKeywords = ['NAME', 'CONTACT', 'DATE', 'MONTHS', 'SR NO'];
   let matchCount = 0;
@@ -146,14 +146,14 @@ export function parseExcelToStructured(filePath: string): {
   const workbook = XLSX.readFile(filePath, { cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: -1, raw: false, defval: '' });
+  const rawRows: unknown[][] = XLSX.utils.sheet_to_json(worksheet, { header: -1, raw: false, defval: '' });
 
   const rowsCount = rawRows.length;
   const colsCount = rawRows.reduce((acc, r) => Math.max(acc, (Array.isArray(r) ? r.length : 0)), 0);
 
   const headerCandidates: { idx: number; month: string }[] = [];
   for (let i = 0; i < rawRows.length; i++) {
-    const row = rawRows[i] as any[];
+    const row = rawRows[i] as unknown[];
     const mh = detectMonthHeaderInRow(row || []);
     if (mh) headerCandidates.push({ idx: i, month: mh });
   }
@@ -163,7 +163,7 @@ export function parseExcelToStructured(filePath: string): {
   for (let h = 0; h < headerCandidates.length; h++) {
     const { idx, month } = headerCandidates[h];
     let inferredYear: number | null = null;
-    const row = rawRows[idx] as any[];
+    const row = rawRows[idx] as unknown[];
     for (const cell of row) {
       if (typeof cell === 'string') {
         const m = cell.match(/(19|20)\d{2}/);
@@ -178,7 +178,7 @@ export function parseExcelToStructured(filePath: string): {
     }
     if (!inferredYear) {
       for (let r = idx + 1; r <= Math.min(idx + 30, rawRows.length - 1); r++) {
-        const maybe = rawRows[r] && rawRows[r][1];
+        const maybe = rawRows[r] && (rawRows[r][1] as unknown);
         const tryYear = tryParseDate(maybe);
         if (tryYear) {
           inferredYear = parseInt(tryYear.slice(0, 4), 10);
@@ -188,7 +188,7 @@ export function parseExcelToStructured(filePath: string): {
     }
     if (!inferredYear) {
       for (let r = idx + 1; r <= Math.min(idx + 30, rawRows.length - 1); r++) {
-        const row2 = rawRows[r] as any[];
+        const row2 = rawRows[r] as unknown[];
         for (const cell of row2) {
           const tryYear = tryParseDate(cell);
           if (tryYear) {
@@ -243,7 +243,7 @@ export function parseExcelToStructured(filePath: string): {
   if (colCounts.length > 0 && colCounts[0].count >= 1) bestPlanCol = colCounts[0].col;
   if (colCounts.some(x => x.col === 5 && x.count >= 1)) bestPlanCol = 5;
 
-  const membersMap: { [id: string]: any } = {};
+  const membersMap: { [id: string]: Member } = {};
   const attendance: AttendanceRow[] = [];
   const manualReview: ManualReviewRow[] = [];
 
@@ -251,8 +251,8 @@ export function parseExcelToStructured(filePath: string): {
   const attendanceDateColumns: { colIndex: number; date: string }[] = [];
 
   for (let i = 0; i < rawRows.length; i++) {
-    const row = rawRows[i] as any[];
-    if (isColumnHeaderRow(row)) {
+    const row = rawRows[i] as unknown[];
+    if (isColumnHeaderRow(row as string[])) { // Cast to string[] for isColumnHeaderRow
       columnHeaderRowIndex = i;
       for (let c = 0; c < row.length; c++) {
         const headerCell = row[c];
@@ -265,14 +265,14 @@ export function parseExcelToStructured(filePath: string): {
     }
   }
 
-  function isLikelyUpperName(cell: any) {
+  function isLikelyUpperName(cell: unknown) {
     if (cell === undefined || cell === null) return false;
     const s = String(cell);
     return /^[A-Z .\-]{2,200}$/.test(s.trim());
   }
 
   for (let r = 0; r < rawRows.length; r++) {
-    const row = rawRows[r] as any[];
+    const row = rawRows[r] as unknown[];
     if (r === columnHeaderRowIndex || detectMonthHeaderInRow(row || [])) continue;
     if (!row || !Array.isArray(row) || row.every(c => (c === undefined || c === null || String(c).trim() === ''))) continue;
 
@@ -288,7 +288,7 @@ export function parseExcelToStructured(filePath: string): {
         }
       }
     }
-    let mobileCandidate: any = null;
+    let mobileCandidate: unknown = null;
     if (row.length > 2 && String(row[2]).match(/\d/)) mobileCandidate = row[2];
     if (!mobileCandidate) {
       for (let c = 0; c < Math.min(12, row.length); c++) {
@@ -354,7 +354,7 @@ export function parseExcelToStructured(filePath: string): {
         name: name || '',
         mobile: mobileCandidate ? String(mobileCandidate) : 'NA',
         mobileNormalized: mobileNormalized || 'NA',
-        planRaw: planRaw || null,
+        planRaw: planRaw === null ? undefined : planRaw,
         planType: mapped.planType || 'Unknown',
         planMonths: mapped.planMonths || null,
         startDate: startDate || null,
@@ -458,7 +458,7 @@ export function computeDerivedDates(member: Member): Member {
       } else {
         m.nextPaymentDueByPlan = null;
       }
-    } catch (e) {
+    } catch (_error) {
       m.nextExpectedAttendance = null;
       m.nextPaymentDueByPlan = null;
     }

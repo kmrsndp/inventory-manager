@@ -1,7 +1,6 @@
 import * as admin from 'firebase-admin';
 import { Member, ImportReport } from './types';
 import { computeDerivedDates } from './parser'; // Import computeDerivedDates
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp
 
 // Initialize Firebase Admin SDK if not already initialized
 if (!admin.apps.length) {
@@ -72,7 +71,7 @@ async function mergeMemberData(
   mergedMember.nextDueDate = importedMember.nextDueDate || mergedMember.nextDueDate;
   mergedMember.totalPaid = importedMember.totalPaid || mergedMember.totalPaid;
   mergedMember.importMonth = importedMember.importMonth || mergedMember.importMonth;
-  mergedMember.updatedAt = Timestamp.now(); // Update to Timestamp
+  mergedMember.updatedAt = admin.firestore.Timestamp.now().toDate().toISOString(); // Update to ISO string
 
   // Recompute derived dates based on merged attendance and plan
   const recomputedMember = computeDerivedDates(mergedMember);
@@ -103,13 +102,7 @@ export async function writeMembersToFirestore(members: Member[], report: ImportR
         batch.set(memberRef, mergedMember, { merge: true });
         report.updated++;
       } else {
-        // Convert ISO strings to Timestamp for new members
-        const newMember: Member = {
-          ...importedMember,
-          createdAt: Timestamp.fromDate(new Date(importedMember.createdAt as unknown as string)),
-          updatedAt: Timestamp.fromDate(new Date(importedMember.updatedAt as unknown as string)),
-        };
-        batch.set(memberRef, newMember);
+        batch.set(memberRef, importedMember);
         report.created++;
       }
 
