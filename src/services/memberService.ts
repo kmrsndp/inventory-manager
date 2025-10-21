@@ -1,192 +1,108 @@
-import { db } from '@/lib/firebase';
-import { Member } from '@/types/member';
+import { db } from "@/lib/firebase";
 import {
   collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
   doc,
-  Timestamp,
+  getDocs,
+  query,
+  writeBatch,
   updateDoc,
   deleteDoc,
-} from 'firebase/firestore';
-import { format, isBefore, isAfter, subDays, parseISO } from 'date-fns';
-import { onSnapshot } from 'firebase/firestore';
+} from "firebase/firestore";
 
-const membersCollection = collection(db, 'members');
+import { Member as MemberType } from "@/types/member";
 
-export const onMembersChange = (
-  userId: string,
-  callback: (members: Member[]) => void,
-  onError: (error: Error) => void
-) => {
-  const q = query(membersCollection, where('userId', '==', userId)); // Assuming members are tied to a userId
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Member[];
-    callback(members);
-  }, (error) => {
-    console.error("Error fetching real-time members:", error);
-    onError(error);
-  });
-  return unsubscribe;
-};
+/**
+ * Normalize mobile number and fallback to 'NA' when missing/invalid
+ */
+function normalizeMobile(mobile: string | undefined): string {
+  if (!mobile || mobile.trim() === "" || isNaN(Number(mobile))) return "NA";
+  return mobile.replace(/[^0-9]/g, "").trim();
+}
 
-export const getMemberByMobile = async (mobile: string): Promise<Member | null> => {
-  const q = query(membersCollection, where('mobile', '==', mobile));
-  const querySnapshot = await getDocs(q);
-  if (!querySnapshot.empty) {
-    return querySnapshot.docs[0].data() as Member;
-  }
-  return null;
-};
+/**
+ * Import members in safe Firestore batches (max 400 ops per batch)
+ */
+export async function importMembers(members: MemberType[]) {
+  console.log(`🚀 Starting import for ${members.length} members`);
 
-export const importMembers = async (members: Partial<Member>[]) => {
-  const batch = writeBatch(db);
+  let processed = 0;
+  let failed = 0;
+  let batch = writeBatch(db);
+  let opCount = 0;
 
-  for (const member of members) {
-    if (!member.mobile) {
-      console.warn('Skipping member due to missing mobile number:', member);
-      continue;
-    }
-
+  for (const [, member] of members.entries()) {
     try {
-      const existingMember = await getMemberByMobile(member.mobile);
+      const normalizedMobile = normalizeMobile(member.mobile);
 
-      if (existingMember) {
-        const memberRef = doc(db, 'members', existingMember.id);
-        const updateData: Partial<Member> = {
-          name: member.name, // Update name as well
-          planType: member.planType,
-          startDate: member.startDate,
-          planMonths: member.planMonths,
-          lastAttendance: member.lastAttendance,
-          nextPaymentDueByPlan: member.nextPaymentDueByPlan,
-          nextDueDate: member.nextDueDate,
-          status: member.status, // Update status if provided
-          updatedAt: Timestamp.now(),
-          importMonth: member.importMonth || 'UNKNOWN',
-        };
+      const cleanMember = {
+        ...member,
+        mobile: normalizedMobile,
+        mobileNormalized: normalizedMobile,
+        lastAttendance: member.lastAttendance || null,
+        createdAt: member.createdAt || new Date().toISOString(),
+        status: member.status || "active",
+      };
 
-        // Only update conflictInfo if there's a name mismatch
-        if (member.name && existingMember.name.toLowerCase() !== member.name.toLowerCase()) {
-          updateData.conflictInfo = {
-            previousName: existingMember.name,
-            importedName: member.name,
-            note: `Name mismatch during import on ${new Date().toLocaleDateString()}`,
-          };
-        }
-        batch.update(memberRef, updateData);
-      } else {
-        const newMemberRef = doc(membersCollection);
-        const newMember: Member = {
-          id: newMemberRef.id,
-          name: member.name || 'Unknown',
-          mobile: member.mobile!,
-          mobileNormalized: member.mobileNormalized || member.mobile!, // Use mobile as fallback
-          planRaw: member.planRaw || null,
-          planType: member.planType || 'Unknown',
-          planMonths: member.planMonths || null,
-          startDate: member.startDate || format(new Date(), 'yyyy-MM-dd'),
-          lastAttendance: member.lastAttendance || null,
-          nextExpectedAttendance: member.nextExpectedAttendance || null,
-          nextPaymentDueByPlan: member.nextPaymentDueByPlan || null,
-          attendedMonths: member.attendedMonths || [],
-          attendanceCount: member.attendanceCount || 0,
-          nextDueDate: member.nextDueDate || null,
-          status: member.status || 'Active',
-          totalPaid: member.totalPaid || 0,
-          payments: member.payments || [],
-          conflictInfo: member.conflictInfo || null,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          importMonth: member.importMonth || 'UNKNOWN',
-          importMonthISO: member.importMonthISO || '',
-        };
-        batch.set(newMemberRef, newMember);
+      const memberRef = doc(db, "members", cleanMember.id);
+      batch.set(memberRef, cleanMember);
+      opCount++;
+
+      if (opCount >= 400) {
+        await batch.commit();
+        console.log(`✅ Batch committed for ${opCount} records`);
+        processed += opCount;
+        batch = writeBatch(db);
+        opCount = 0;
       }
     } catch (error) {
-      console.error(`Error processing member ${member.mobile}:`, error);
-      // Continue to next member even if one fails
+      failed++;
+      console.error("❌ Error importing member", member, error);
     }
   }
 
-  try {
+  if (opCount > 0) {
     await batch.commit();
-  } catch (error) {
-    console.error('Error committing batch:', error);
-    throw error; // Re-throw to be caught by the UI component
-  }
-};
-
-export const getMembers = async (): Promise<Member[]> => {
-  const querySnapshot = await getDocs(membersCollection);
-  return querySnapshot.docs.map(doc => doc.data() as Member);
-};
-
-export const updateMember = async (id: string, memberData: Partial<Member>) => {
-  const memberRef = doc(db, 'members', id);
-  await updateDoc(memberRef, {
-    ...memberData,
-    updatedAt: Timestamp.now(),
-  });
-};
-
-export const deleteMember = async (id: string) => {
-  const memberRef = doc(db, 'members', id);
-  await deleteDoc(memberRef);
-};
-
-export const updateMemberStatus = async (): Promise<{ totalMembers: number; activeCount: number; dueSoonCount: number; overdueCount: number }> => {
-  const querySnapshot = await getDocs(membersCollection);
-  const members = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Member[];
-
-  let activeCount = 0;
-  let dueSoonCount = 0;
-  let overdueCount = 0;
-  const today = new Date();
-
-  const batch = writeBatch(db);
-
-  for (const member of members) {
-    let newStatus: Member['status'] = member.status;
-    if (member.nextDueDate) {
-      const nextDueDate = parseISO(member.nextDueDate);
-      if (isBefore(today, nextDueDate)) {
-        // If today is within 7 days before nextDueDate
-        if (isAfter(today, subDays(nextDueDate, 7))) {
-          newStatus = 'DueSoon';
-        } else {
-          newStatus = 'Active';
-        }
-      } else if (isAfter(today, nextDueDate)) {
-        newStatus = 'Overdue';
-      }
-    } else {
-      newStatus = 'Unknown'; // Or a default status if nextDueDate is missing
-    }
-
-    if (newStatus !== member.status) {
-      const memberRef = doc(db, 'members', member.id);
-      batch.update(memberRef, { status: newStatus, updatedAt: Timestamp.now() });
-    }
-
-    // Count for summary
-    if (newStatus === 'Active') {
-      activeCount++;
-    } else if (newStatus === 'DueSoon') {
-      dueSoonCount++;
-    } else if (newStatus === 'Overdue') {
-      overdueCount++;
-    }
+    processed += opCount;
   }
 
-  await batch.commit();
+  console.log(`🎯 Import complete. Processed=${processed}, Failed=${failed}`);
+}
 
-  return {
-    totalMembers: members.length,
-    activeCount,
-    dueSoonCount,
-    overdueCount,
-  };
-};
+/**
+ * Fetch all members
+ */
+export async function getMembers(): Promise<MemberType[]> {
+  const q = query(collection(db, "members"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as MemberType[];
+}
+
+/**
+ * Update a member record (used by MemberModal)
+ */
+export async function updateMember(id: string, data: Partial<MemberType>) {
+  const ref = doc(db, "members", id);
+  await updateDoc(ref, data);
+  console.log(`🟢 Member ${id} updated`, data);
+}
+
+/**
+ * Update member status only
+ */
+export async function updateMemberStatus(id: string, status: string) {
+  const ref = doc(db, "members", id);
+  await updateDoc(ref, { status });
+  console.log(`🔵 Member ${id} status updated → ${status}`);
+}
+
+/**
+ * Delete a member
+ */
+export async function deleteMember(id: string) {
+  const ref = doc(db, "members", id);
+  await deleteDoc(ref);
+  console.log(`🗑️ Member ${id} deleted`);
+}

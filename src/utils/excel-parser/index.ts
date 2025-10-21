@@ -1,6 +1,6 @@
 import { parseExcelToStructured } from './parser';
 import { writeMembersToFirestore } from './firestore';
-import { ImportReport, Diagnostics, Member, ManualReviewRow, AttendanceRow } from './types';
+import { ImportReport } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -13,7 +13,7 @@ import * as path from 'path';
 export async function importExcelToFirestore(filePath: string, outputDir: string = './imports'): Promise<ImportReport> {
   console.log(`Starting Excel import for file: ${filePath}`);
 
-  const { members, attendance, manualReview, diagnostics } = parseExcelToStructured(filePath);
+  const { members, diagnostics } = parseExcelToStructured(filePath);
 
   const report: ImportReport = {
     totalRows: diagnostics.totalRows,

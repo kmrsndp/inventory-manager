@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { onMembersChange, updateMember, deleteMember } from '@/services/memberService';
+import { updateMember, deleteMember } from '@/services/memberService';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Member } from '@/types/member';
 import { Pencil, Trash2 } from 'lucide-react';
 import MemberModal from './MemberModal'; // Assuming a modal for editing members
@@ -18,15 +20,25 @@ export default function MembersList() {
 
   useEffect(() => {
     if (user) {
-      setLoading(true);
-      const unsubscribe = onMembersChange(user.uid, (fetchedMembers: Member[]) => {
+      const membersCollection = collection(db, 'members');
+      const q = query(membersCollection, orderBy('createdAt', 'desc'));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const fetchedMembers: Member[] = snapshot.docs.map(doc => {
+          const data = doc.data() as Member;
+          return {
+            ...data,
+            id: doc.id, // Ensure doc.id is used as the primary ID
+          };
+        });
         setMembers(fetchedMembers);
         setLoading(false);
-      }, (err: Error) => {
-        console.error("Failed to fetch members:", err);
+      }, (error) => {
+        console.error("Error fetching members:", error);
+        toast.error("Failed to load members.");
         setLoading(false);
-        toast.error('Failed to load members.');
       });
+
       return () => unsubscribe();
     }
   }, [user]);
@@ -76,11 +88,11 @@ export default function MembersList() {
               <tr>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Mobile</th>
-                <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Plan Type</th>
-                <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Plan Months</th>
+                <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Plan</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Last Attendance</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Next Payment Due</th>
                 <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Attended Months</th>
+                <th className="py-3 px-4 text-left text-sm text-gray-500 uppercase tracking-wider">Status</th> {/* Added Status column */}
                 <th className="py-3 px-4 text-right text-sm text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -89,11 +101,22 @@ export default function MembersList() {
                 <tr key={member.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4 text-left text-gray-700">{member.name}</td>
                   <td className="py-3 px-4 text-left text-gray-700">{member.mobileNormalized}</td>
-                  <td className="py-3 px-4 text-left text-gray-700">{member.planType || 'N/A'}</td>
-                  <td className="py-3 px-4 text-right text-gray-700">{member.planMonths || 'N/A'}</td>
+                  <td className="py-3 px-4 text-left text-gray-700">
+                    {member.planType && member.planMonths ? `${member.planType} (${member.planMonths}M)` : member.planRaw || 'N/A'}
+                  </td>
                   <td className="py-3 px-4 text-left text-gray-700">{member.lastAttendance || 'N/A'}</td>
                   <td className="py-3 px-4 text-left text-gray-700">{member.nextPaymentDueByPlan || 'N/A'}</td>
                   <td className="py-3 px-4 text-left text-gray-700">{member.attendedMonths.join(', ') || 'N/A'}</td>
+                  <td className="py-3 px-4 text-left text-gray-700">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      member.status === 'Active' ? 'bg-green-100 text-green-800' :
+                      member.status === 'DueSoon' ? 'bg-yellow-100 text-yellow-800' :
+                      member.status === 'Overdue' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {member.status || 'Unknown'}
+                    </span>
+                  </td> {/* Display Status */}
                   <td className="py-3 px-4 text-right space-x-2">
                     <button onClick={() => setEditingMember(member)} className="p-1 rounded-full hover:bg-gray-100">
                       <Pencil size={16} className="text-gray-600" />
